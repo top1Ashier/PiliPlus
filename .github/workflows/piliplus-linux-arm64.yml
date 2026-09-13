@@ -46,12 +46,31 @@ jobs:
           if grep -q 'not found' dependencies.txt; then exit 1; fi
           tar -czf "PiliPlus_linux_${version}_arm64.tar.gz" -C "$bundle" .
           sha256sum PiliPlus_linux_*_arm64.tar.gz > SHA256SUMS
+      - name: Package ARM64 deb
+        run: |
+          pkg="$RUNNER_TEMP/piliplus-deb"
+          mkdir -p "$pkg/DEBIAN" "$pkg/opt/PiliPlus" "$pkg/usr/bin" "$pkg/usr/share/applications" "$pkg/usr/share/icons/hicolor/512x512/apps"
+          cp -a build/linux/arm64/release/bundle/. "$pkg/opt/PiliPlus/"
+          ln -s /opt/PiliPlus/piliplus "$pkg/usr/bin/piliplus"
+          install -m 644 assets/linux/com.example.piliplus.desktop "$pkg/usr/share/applications/"
+          install -m 644 assets/images/logo/logo.png "$pkg/usr/share/icons/hicolor/512x512/apps/piliplus.png"
+          cp assets/linux/DEBIAN/control "$pkg/DEBIAN/control"
+          sed -i "s/^Package:.*/Package: piliplus/; s/^Version:.*/Version: $version/; s/^Architecture:.*/Architecture: arm64/; s/^Installed-Size:.*/Installed-Size: $(du -sk "$pkg/opt" "$pkg/usr" | awk '{s+=$1} END {print s}')/" "$pkg/DEBIAN/control"
+          sed -i 's/^Depends:.*/Depends: libc6 (>= 2.39), libstdc++6, libasound2t64, libwebkit2gtk-4.1-0, libgtk-3-0t64,/' "$pkg/DEBIAN/control"
+          chmod 755 "$pkg/opt/PiliPlus/piliplus"
+          dpkg-deb --build --root-owner-group "$pkg" "PiliPlus_linux_${version}_arm64.deb"
+          dpkg-deb --info PiliPlus_linux_*_arm64.deb
+          test "$(dpkg-deb -f PiliPlus_linux_*_arm64.deb Architecture)" = arm64
+          sudo apt-get install -y ./PiliPlus_linux_*_arm64.deb
+          test -x /usr/bin/piliplus
+          sha256sum PiliPlus_linux_*_arm64.tar.gz PiliPlus_linux_*_arm64.deb > SHA256SUMS
       - name: Upload ARM64 package
         uses: actions/upload-artifact@v7
         with:
           name: PiliPlus-linux-arm64
           path: |
             PiliPlus_linux_*_arm64.tar.gz
+            PiliPlus_linux_*_arm64.deb
             SHA256SUMS
             dependencies.txt
           if-no-files-found: error
