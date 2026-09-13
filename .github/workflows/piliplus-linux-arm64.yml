@@ -1,0 +1,58 @@
+name: PiliPlus 2.1.4 Linux ARM64
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: bggRGjQaUbCoE/PiliPlus
+          ref: ce17223a8d71338d0c452a05f8fc55e86a3bba64
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.1-dev libasound2-dev libmpv-dev liblzma-dev
+          test "$(uname -m)" = aarch64
+          command -v pwsh
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          architecture: arm64
+          cache: false
+      - name: Set release metadata
+        shell: pwsh
+        run: lib/scripts/build.ps1
+      - name: Apply upstream patches
+        shell: pwsh
+        run: lib/scripts/patch.ps1 Linux
+      - name: Build Linux ARM64
+        run: |
+          flutter config --enable-linux-desktop
+          flutter build linux --release --target-platform linux-arm64 --dart-define-from-file=pili_release.json --no-pub
+      - name: Verify and package
+        run: |
+          bundle=build/linux/arm64/release/bundle
+          file "$bundle/piliplus"
+          readelf -h "$bundle/piliplus" | grep -q 'Machine:.*AArch64'
+          ldd "$bundle/piliplus" | tee dependencies.txt
+          if grep -q 'not found' dependencies.txt; then exit 1; fi
+          tar -czf "PiliPlus_linux_${version}_arm64.tar.gz" -C "$bundle" .
+          sha256sum PiliPlus_linux_*_arm64.tar.gz > SHA256SUMS
+      - name: Upload ARM64 package
+        uses: actions/upload-artifact@v7
+        with:
+          name: PiliPlus-linux-arm64
+          path: |
+            PiliPlus_linux_*_arm64.tar.gz
+            SHA256SUMS
+            dependencies.txt
+          if-no-files-found: error
+          retention-days: 14
