@@ -20,13 +20,13 @@ jobs:
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.1-dev libasound2-dev libmpv-dev liblzma-dev
           test "$(uname -m)" = aarch64
           command -v pwsh
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version-file: pubspec.yaml
-          architecture: arm64
-          cache: false
+      - name: Setup Flutter from official Git tag
+        run: |
+          git clone --depth 1 --branch 3.47.4 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "FLUTTER_ROOT=$RUNNER_TEMP/flutter" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+          "$RUNNER_TEMP/flutter/bin/flutter" precache --linux
       - name: Set release metadata
         shell: pwsh
         run: lib/scripts/build.ps1
